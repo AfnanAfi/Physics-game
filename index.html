@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHYSICA — The Physics RPG</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --void: #08090f;
+    --deep: #0e1020;
+    --surface: #141628;
+    --panel: #1a1e35;
+    --border: #2a2f52;
+    --accent: #7c6af7;
+    --accent2: #c084fc;
+    --gold: #f5c842;
+    --cyan: #22d3ee;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #e2e4f0;
+    --muted: #6b7280;
+    --glow: rgba(124,106,247,0.35);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Starfield */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 10%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 45%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 20% 90%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 92% 35%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(2px 2px at 60% 75%, rgba(124,106,247,0.6) 0%, transparent 100%),
+      radial-gradient(2px 2px at 40% 15%, rgba(192,132,252,0.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app { position: relative; z-index: 1; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: rgba(14,16,32,0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex; align-items: center; gap: 16px;
+    z-index: 100;
+    flex-wrap: wrap;
+  }
+
+  .hud-title {
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+
+  .hud-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+  .hud-stat { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+  .hud-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .hud-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--gold); }
+  .hud-rank { color: var(--accent2); font-weight: 600; }
+
+  .xp-bar-wrap { flex: 1; min-width: 80px; max-width: 160px; }
+  .xp-bar-bg { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+  .xp-bar-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 0 8px var(--glow);
+  }
+  .xp-text { font-size: 0.65rem; color: var(--muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+
+  /* Screens */
+  .screen { min-height: 100vh; padding: 80px 20px 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .screen.hidden { display: none; }
+
+  /* Title Screen */
+  #title-screen {
+    text-align: center;
+    gap: 24px;
+  }
+
+  .hero-glyph {
+    font-size: 5rem;
+    filter: drop-shadow(0 0 24px var(--glow));
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  .game-title {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff 0%, var(--accent2) 50%, var(--accent) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    text-shadow: none;
+  }
+
+  .game-subtitle {
+    font-size: 0.95rem;
+    color: var(--muted);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .story-text {
+    max-width: 540px;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #a0a8c0;
+    margin: 8px auto;
+  }
+
+  .story-text em { color: var(--accent2); font-style: normal; font-weight: 500; }
+
+  /* Topic picker */
+  .topic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    max-width: 640px;
+    width: 100%;
+  }
+
+  .topic-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .topic-card:hover, .topic-card.selected {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.12);
+    box-shadow: 0 0 16px var(--glow);
+    transform: translateY(-2px);
+  }
+  .topic-card .topic-icon { font-size: 1.8rem; margin-bottom: 6px; display: block; }
+
+  /* Buttons */
+  .btn {
+    padding: 12px 32px;
+    border: none; border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    box-shadow: 0 4px 20px var(--glow);
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px var(--glow); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Battle Screen */
+  #battle-screen { gap: 0; padding-top: 72px; }
+
+  .battle-arena {
+    width: 100%; max-width: 760px;
+    display: flex; flex-direction: column; gap: 16px;
+    padding: 20px;
+  }
+
+  /* Enemy */
+  .enemy-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex; align-items: center; gap: 16px;
+  }
+
+  .enemy-sprite { font-size: 3.5rem; filter: drop-shadow(0 0 16px var(--glow)); flex-shrink: 0; }
+
+  .enemy-info { flex: 1; }
+  .enemy-name { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.1rem; color: var(--accent2); }
+  .enemy-lore { font-size: 0.78rem; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+  .level-badge {
+    background: linear-gradient(135deg, #7c3aed, var(--accent));
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  /* Question Box */
+  .question-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .question-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .question-type { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .xp-reward { font-size: 0.78rem; color: var(--gold); font-family: 'JetBrains Mono', monospace; }
+
+  .question-text {
+    font-size: 1rem;
+    line-height: 1.65;
+    margin-bottom: 18px;
+    color: var(--text);
+    min-height: 60px;
+  }
+
+  .loading-dots { display: inline-flex; gap: 4px; align-items: center; }
+  .loading-dots span {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse-dot 1.2s ease-in-out infinite;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse-dot { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+
+  /* Answer area */
+  .answer-area { display: flex; flex-direction: column; gap: 8px; }
+
+  .answer-option {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    transition: all 0.15s;
+    text-align: left;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+  }
+  .answer-option:hover:not(:disabled) { border-color: var(--accent); background: rgba(124,106,247,0.1); }
+  .answer-option.correct { border-color: var(--green); background: rgba(74,222,128,0.1); color: var(--green); }
+  .answer-option.wrong { border-color: var(--red); background: rgba(248,113,113,0.1); color: var(--red); }
+  .answer-option:disabled { cursor: default; }
+
+  .open-answer-wrap { display: flex; gap: 8px; }
+  .open-input {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .open-input:focus { border-color: var(--accent); }
+
+  /* Feedback */
+  .feedback-box {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-top: 12px;
+    color: #c0c8e0;
+    border-left: 3px solid var(--accent);
+    display: none;
+  }
+  .feedback-box.visible { display: block; }
+  .feedback-box.correct-fb { border-color: var(--green); }
+  .feedback-box.wrong-fb { border-color: var(--red); }
+
+  /* Rank Up */
+  #rankup-screen { text-align: center; gap: 20px; }
+  .rankup-glyph { font-size: 5rem; animation: float 2s ease-in-out infinite; filter: drop-shadow(0 0 32px var(--gold)); }
+  .rankup-title { font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 900; color: var(--gold); }
+  .rankup-rank { font-size: 1.5rem; font-weight: 600; color: var(--accent2); margin-top: 4px; }
+  .rankup-desc { max-width: 400px; color: var(--muted); font-size: 0.9rem; line-height: 1.7; }
+
+  /* Progress Strip */
+  .progress-strip {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .progress-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+  .progress-dot.done { background: var(--green); }
+  .progress-dot.current { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .progress-dot.wrong-dot { background: var(--red); }
+
+  /* Transition flash */
+  .flash {
+    position: fixed; inset: 0; background: var(--accent);
+    opacity: 0; pointer-events: none; z-index: 999;
+    transition: opacity 0.2s;
+  }
+  .flash.on { opacity: 0.12; }
+
+  /* Section label */
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .streak-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(245,200,66,0.12);
+    border: 1px solid rgba(245,200,66,0.3);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .combo-flash {
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    color: var(--gold);
+    height: 24px;
+    transition: opacity 0.3s;
+    opacity: 0;
+  }
+  .combo-flash.show { opacity: 1; }
+
+  @media (max-width: 500px) {
+    .enemy-card { flex-wrap: wrap; }
+    .topic-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="flash" id="flash"></div>
+
+  <!-- HUD -->
+  <div id="hud" style="display:none;">
+    <span class="hud-title">PHYSICA</span>
+    <div class="hud-divider"></div>
+    <div class="hud-stat"><span class="hud-label">Rank</span><span class="hud-rank" id="hud-rank">Novice</span></div>
+    <div class="hud-divider"></div>
+    <div class="hud-stat"><span class="hud-label">XP</span><span class="hud-value" id="hud-xp">0</span></div>
+    <div class="hud-divider"></div>
+    <div class="hud-stat"><span class="hud-label">Streak</span><span class="streak-badge" id="hud-streak">🔥 0</span></div>
+    <div class="hud-divider"></div>
+    <div class="xp-bar-wrap">
+      <div class="xp-bar-bg"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
+      <div class="xp-text" id="xp-text">0 / 100 XP</div>
+    </div>
+  </div>
+
+  <!-- TITLE SCREEN -->
+  <div id="title-screen" class="screen">
+    <div class="hero-glyph">⚡</div>
+    <div>
+      <div class="game-title">PHYSICA</div>
+      <div class="game-subtitle">The Physics Multiverse</div>
+    </div>
+    <p class="story-text">
+      The <em>Entropy Engine</em> has shattered the laws of physics across the multiverse.
+      Rogue forces — the <em>Kinetic Wraith</em>, the <em>Wave Specter</em>, the <em>Quantum Lich</em> — now exploit the chaos.
+      You are a <em>Physics Adept</em>: armed with knowledge, bound by no equation you haven't mastered.
+      Face each enemy. Answer their challenge. Restore the constants.
+    </p>
+
+    <div class="section-label">Choose your battleground</div>
+    <div class="topic-grid" id="topic-grid">
+      <div class="topic-card" data-topic="Mechanics" onclick="selectTopic(this)">
+        <span class="topic-icon">🏹</span>Mechanics
+      </div>
+      <div class="topic-card" data-topic="Thermodynamics" onclick="selectTopic(this)">
+        <span class="topic-icon">🔥</span>Thermodynamics
+      </div>
+      <div class="topic-card" data-topic="Waves & Optics" onclick="selectTopic(this)">
+        <span class="topic-icon">🌊</span>Waves & Optics
+      </div>
+      <div class="topic-card" data-topic="Electromagnetism" onclick="selectTopic(this)">
+        <span class="topic-icon">⚡</span>Electromagnetism
+      </div>
+      <div class="topic-card" data-topic="Quantum Physics" onclick="selectTopic(this)">
+        <span class="topic-icon">🔮</span>Quantum Physics
+      </div>
+      <div class="topic-card" data-topic="Relativity" onclick="selectTopic(this)">
+        <span class="topic-icon">🕳️</span>Relativity
+      </div>
+    </div>
+    <button class="btn btn-primary" id="start-btn" onclick="startGame()" disabled>Enter the Multiverse →</button>
+  </div>
+
+  <!-- BATTLE SCREEN -->
+  <div id="battle-screen" class="screen hidden">
+    <div class="battle-arena">
+      <div class="combo-flash" id="combo-flash">⚡ COMBO ×3!</div>
+
+      <!-- Enemy -->
+      <div class="enemy-card">
+        <div class="enemy-sprite" id="enemy-sprite">👾</div>
+        <div class="enemy-info">
+          <div class="enemy-name" id="enemy-name">Loading…</div>
+          <div class="enemy-lore" id="enemy-lore"></div>
+        </div>
+        <div class="level-badge" id="level-badge">LVL 1</div>
+      </div>
+
+      <!-- Progress -->
+      <div>
+        <div class="progress-strip" id="progress-strip"></div>
+        <div class="section-label" id="progress-label">Question 1 of 5</div>
+      </div>
+
+      <!-- Question -->
+      <div class="question-box">
+        <div class="question-header">
+          <span class="question-type" id="q-type">Conceptual</span>
+          <span class="xp-reward" id="q-xp">+20 XP</span>
+        </div>
+        <div class="question-text" id="question-text">
+          <span class="loading-dots"><span></span><span></span><span></span></span>
+        </div>
+        <div class="answer-area" id="answer-area"></div>
+        <div class="feedback-box" id="feedback-box"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="goTitle()">← Retreat</button>
+        <button class="btn btn-primary" id="next-btn" onclick="nextQuestion()" style="display:none;">Next Challenge →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RANK UP SCREEN -->
+  <div id="rankup-screen" class="screen hidden">
+    <div class="rankup-glyph" id="rankup-glyph">🏆</div>
+    <div class="rankup-title">RANK UP!</div>
+    <div class="rankup-rank" id="rankup-rank-name"></div>
+    <p class="rankup-desc" id="rankup-desc"></p>
+    <button class="btn btn-primary" onclick="continueAfterRankup()">Continue Journey →</button>
+  </div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const RANKS = [
+  { name: "Novice Adept",    xp: 0,    glyph: "🌱", desc: "You've taken your first step into the universe of physics." },
+  { name: "Apprentice",      xp: 100,  glyph: "⚗️", desc: "The fundamentals are no longer strangers. You begin to see patterns." },
+  { name: "Scholar",         xp: 250,  glyph: "📐", desc: "Equations flow from you. Enemies of ignorance begin to fear your reasoning." },
+  { name: "Theorist",        xp: 500,  glyph: "🔭", desc: "You see beyond the formula — you understand the *why* behind every law." },
+  { name: "Quantum Sage",    xp: 900,  glyph: "🔮", desc: "The probabilistic nature of reality is your playground. Uncertainty bows to you." },
+  { name: "Relativist",      xp: 1400, glyph: "🌀", desc: "Space and time bend at your command. You've mastered the fabric of existence." },
+  { name: "Entropy Lord",    xp: 2000, glyph: "⚡", desc: "The Entropy Engine itself trembles. You are physics incarnate." },
+];
+
+const ENEMIES = {
+  "Mechanics":       [
+    { name:"Kinetic Wraith",   sprite:"👻", lore:"Born from unchecked momentum — it feeds on static objects." },
+    { name:"Gravity Golem",    sprite:"🪨", lore:"An ancient mass that pulls everything into orbit around its ego." },
+    { name:"Friction Phantom", sprite:"🌫️", lore:"Slows every hero to a crawl. Efficiency is its enemy." },
+  ],
+  "Thermodynamics":  [
+    { name:"Entropy Specter",  sprite:"🌡️", lore:"Disorder made flesh. It turns order to chaos with a single touch." },
+    { name:"Heat Wraith",      sprite:"🔥", lore:"Feeds on temperature gradients. Equilibrium is its death." },
+    { name:"Carnot Lich",      sprite:"⚙️", lore:"Obsessed with the ideal cycle. Destroys all inefficiency mercilessly." },
+  ],
+  "Waves & Optics":  [
+    { name:"Wave Specter",     sprite:"🌊", lore:"Exists in superposition — constructive and destructive at once." },
+    { name:"Refraction Shade", sprite:"🌈", lore:"Bends light to deceive heroes. Nothing appears as it truly is." },
+    { name:"Resonance Demon",  sprite:"🎵", lore:"Finds your natural frequency and shakes you apart." },
+  ],
+  "Electromagnetism":[
+    { name:"Flux Revenant",    sprite:"🧲", lore:"A changing field of pure chaos. Induces panic in unprepared minds." },
+    { name:"Coulomb Wraith",   sprite:"⚡", lore:"Carries infinite charge. The inverse-square law is its weapon." },
+    { name:"Maxwell Lich",     sprite:"📡", lore:"It encodes itself in four equations. Only the wise can decode its form." },
+  ],
+  "Quantum Physics": [
+    { name:"Uncertainty Shade",sprite:"❓", lore:"Its position AND momentum are unknowable. A true dual-natured foe." },
+    { name:"Schrödinger Beast",sprite:"🐈", lore:"Simultaneously defeated and undefeated until you observe it." },
+    { name:"Quantum Lich",     sprite:"🔮", lore:"Master of entanglement — defeat it in one dimension, it strikes in another." },
+  ],
+  "Relativity":      [
+    { name:"Time Dilator",     sprite:"⏳", lore:"It moves near light speed. From its frame, you fight in slow motion." },
+    { name:"Spacetime Wraith", sprite:"🕳️", lore:"Warps the arena itself. Distance and duration are its weapons." },
+    { name:"Lorentz Specter",  sprite:"🌀", lore:"Length contracts, time stretches. Only relativistic reasoning defeats it." },
+  ],
+};
+
+let state = {
+  topic: null,
+  xp: 0,
+  streak: 0,
+  level: 1,
+  rankIndex: 0,
+  questionIndex: 0,
+  totalQuestions: 5,
+  dotStatuses: [],
+  pendingRankup: null,
+  answered: false,
+  currentQuestion: null,
+};
+
+// ── TOPIC SELECT ───────────────────────────────────────────────────────────────
+function selectTopic(el) {
+  document.querySelectorAll('.topic-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.topic = el.dataset.topic;
+  document.getElementById('start-btn').disabled = false;
+}
+
+// ── START GAME ─────────────────────────────────────────────────────────────────
+function startGame() {
+  state.xp = 0;
+  state.streak = 0;
+  state.level = 1;
+  state.rankIndex = 0;
+  state.questionIndex = 0;
+  state.dotStatuses = [];
+  updateHUD();
+  show('battle-screen');
+  document.getElementById('hud').style.display = 'flex';
+  loadEnemy();
+  loadQuestion();
+}
+
+function getEnemy() {
+  const pool = ENEMIES[state.topic];
+  return pool[Math.min(Math.floor((state.level - 1) / 2), pool.length - 1)];
+}
+
+function loadEnemy() {
+  const e = getEnemy();
+  document.getElementById('enemy-sprite').textContent = e.sprite;
+  document.getElementById('enemy-name').textContent = e.name;
+  document.getElementById('enemy-lore').textContent = e.lore;
+  document.getElementById('level-badge').textContent = `LVL ${state.level}`;
+}
+
+// ── QUESTION LOADING ───────────────────────────────────────────────────────────
+const DIFFICULTY = [
+  "very easy and conceptual (just definitions or true/false reasoning)",
+  "easy (basic application of a single formula or concept)",
+  "medium difficulty (multi-step reasoning or comparison between concepts)",
+  "hard (problem-solving with multiple steps, edge cases, or deeper understanding)",
+  "very hard and expert-level (synthesis across concepts, tricky nuances, common misconceptions)"
+];
+
+async function loadQuestion() {
+  state.answered = false;
+  const qNum = state.questionIndex + 1;
+  const total = state.totalQuestions;
+  const diffIdx = Math.min(state.questionIndex, 4);
+  const diff = DIFFICULTY[diffIdx];
+  const xpReward = [15, 20, 30, 45, 60][diffIdx];
+
+  document.getElementById('q-type').textContent = ['Conceptual','Basic Application','Reasoning','Problem Solving','Expert Challenge'][diffIdx];
+  document.getElementById('q-xp').textContent = `+${xpReward} XP`;
+  document.getElementById('progress-label').textContent = `Question ${qNum} of ${total}`;
+
+  // Update progress dots
+  updateDots();
+
+  document.getElementById('question-text').innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
+  document.getElementById('answer-area').innerHTML = '';
+  document.getElementById('feedback-box').className = 'feedback-box';
+  document.getElementById('next-btn').style.display = 'none';
+
+  const enemy = getEnemy();
+  const prompt = `You are PHYSICA, a physics education game AI.
+
+Topic: ${state.topic}
+Enemy: ${enemy.name} (${enemy.lore})
+Difficulty: ${diff} (question ${qNum} of ${total} in the level)
+
+Generate a ${diff} physics question about ${state.topic} that thematically involves the enemy "${enemy.name}".
+The question should feel like it fits a fantasy RPG battle while teaching real physics.
+
+Return ONLY valid JSON (no markdown, no backticks) in this exact format:
+{
+  "question": "The question text (can include a brief scenario)",
+  "type": "mcq",
+  "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+  "answer_index": 0,
+  "explanation": "A clear, enthusiastic 2-3 sentence explanation of why this answer is correct and what the physics concept is."
+}
+
+Make sure exactly one option is correct. The explanation should feel rewarding and teach something.`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content.map(b => b.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const q = JSON.parse(clean);
+    state.currentQuestion = { ...q, xpReward };
+    renderQuestion(q, xpReward);
+  } catch(e) {
+    // Fallback question
+    const fallback = getFallback(state.topic, diffIdx);
+    state.currentQuestion = { ...fallback, xpReward };
+    renderQuestion(fallback, xpReward);
+  }
+}
+
+function renderQuestion(q, xpReward) {
+  document.getElementById('question-text').textContent = q.question;
+  const area = document.getElementById('answer-area');
+  area.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-option';
+    btn.textContent = opt;
+    btn.onclick = () => handleAnswer(i, q, xpReward);
+    area.appendChild(btn);
+  });
+}
+
+function handleAnswer(chosen, q, xpReward) {
+  if (state.answered) return;
+  state.answered = true;
+
+  const btns = document.querySelectorAll('.answer-option');
+  btns.forEach(b => b.disabled = true);
+
+  const correct = chosen === q.answer_index;
+
+  btns[q.answer_index].classList.add('correct');
+  if (!correct) btns[chosen].classList.add('wrong');
+
+  const fb = document.getElementById('feedback-box');
+  fb.textContent = q.explanation;
+  fb.className = 'feedback-box visible ' + (correct ? 'correct-fb' : 'wrong-fb');
+
+  // Update dot
+  state.dotStatuses[state.questionIndex] = correct ? 'done' : 'wrong';
+  updateDots();
+
+  if (correct) {
+    state.streak++;
+    const bonus = state.streak >= 3 ? Math.floor(xpReward * 0.5) : 0;
+    const gained = xpReward + bonus;
+    state.xp += gained;
+
+    if (state.streak >= 3) showCombo();
+
+    // Check rank up
+    const nextRank = RANKS[state.rankIndex + 1];
+    if (nextRank && state.xp >= nextRank.xp) {
+      state.rankIndex++;
+      state.pendingRankup = RANKS[state.rankIndex];
+    }
+  } else {
+    state.streak = 0;
+  }
+
+  updateHUD();
+  document.getElementById('next-btn').style.display = 'inline-block';
+}
+
+function showCombo() {
+  const el = document.getElementById('combo-flash');
+  el.textContent = `⚡ COMBO ×${state.streak}!`;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function nextQuestion() {
+  if (state.pendingRankup) {
+    const r = state.pendingRankup;
+    state.pendingRankup = null;
+    document.getElementById('rankup-glyph').textContent = r.glyph;
+    document.getElementById('rankup-rank-name').textContent = r.name;
+    document.getElementById('rankup-desc').textContent = r.desc;
+    document.getElementById('hud-rank').textContent = r.name;
+    show('rankup-screen');
+    return;
+  }
+
+  state.questionIndex++;
+  if (state.questionIndex >= state.totalQuestions) {
+    // Level complete
+    state.level++;
+    state.questionIndex = 0;
+    state.dotStatuses = [];
+    loadEnemy();
+    loadQuestion();
+  } else {
+    loadQuestion();
+  }
+}
+
+function continueAfterRankup() {
+  show('battle-screen');
+  state.questionIndex++;
+  if (state.questionIndex >= state.totalQuestions) {
+    state.level++;
+    state.questionIndex = 0;
+    state.dotStatuses = [];
+    loadEnemy();
+  }
+  loadQuestion();
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  const rank = RANKS[state.rankIndex];
+  const next = RANKS[state.rankIndex + 1];
+  document.getElementById('hud-xp').textContent = state.xp;
+  document.getElementById('hud-rank').textContent = rank.name;
+  document.getElementById('hud-streak').textContent = `🔥 ${state.streak}`;
+
+  const pct = next ? Math.min(((state.xp - rank.xp) / (next.xp - rank.xp)) * 100, 100) : 100;
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('xp-text').textContent = next ? `${state.xp} / ${next.xp} XP` : `MAX RANK`;
+}
+
+function updateDots() {
+  const strip = document.getElementById('progress-strip');
+  strip.innerHTML = '';
+  for (let i = 0; i < state.totalQuestions; i++) {
+    const dot = document.createElement('div');
+    const status = state.dotStatuses[i];
+    if (status === 'done') dot.className = 'progress-dot done';
+    else if (status === 'wrong') dot.className = 'progress-dot wrong-dot';
+    else if (i === state.questionIndex) dot.className = 'progress-dot current';
+    else dot.className = 'progress-dot';
+    strip.appendChild(dot);
+  }
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function show(screenId) {
+  const fl = document.getElementById('flash');
+  fl.classList.add('on');
+  setTimeout(() => {
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById(screenId).classList.remove('hidden');
+    fl.classList.remove('on');
+  }, 150);
+}
+
+function goTitle() {
+  document.getElementById('hud').style.display = 'none';
+  show('title-screen');
+}
+
+// ── FALLBACKS ─────────────────────────────────────────────────────────────────
+function getFallback(topic, diff) {
+  const fallbacks = {
+    "Mechanics": [
+      { question: "The Kinetic Wraith charges at you. What quantity represents the product of mass and velocity?", options:["A) Force","B) Momentum","C) Energy","D) Acceleration"], answer_index:1, explanation:"Momentum = mass × velocity (p = mv). It's a vector quantity that describes an object's motion state. The Wraith's charge embodies this perfectly!" },
+    ],
+    "Thermodynamics": [
+      { question: "The Entropy Specter claims disorder always increases. In which type of system is this true?", options:["A) Open system","B) Closed system","C) Isolated system","D) Any system"], answer_index:2, explanation:"The Second Law of Thermodynamics states entropy increases in isolated systems. Open and closed systems can have local entropy decreases if energy is exchanged." },
+    ],
+  };
+  const pool = fallbacks[topic] || fallbacks["Mechanics"];
+  return pool[0];
+}
+</script>
+</body>
+</html>
